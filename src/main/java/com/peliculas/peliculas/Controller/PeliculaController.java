@@ -2,8 +2,11 @@ package com.peliculas.peliculas.Controller;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 
 
 
@@ -28,26 +33,48 @@ public class PeliculaController {
     public PeliculaService peliculaService;
 
     @GetMapping
-    public List<Pelicula> getAllPeliculas() {
-        return peliculaService.getAllPeliculas();
+    public CollectionModel<EntityModel<Pelicula>> getAllPeliculas() {
+        List<EntityModel<Pelicula>> peliculas = peliculaService.getAllPeliculas().stream()
+            .map(pelicula -> EntityModel.of(pelicula,
+                linkTo(methodOn(PeliculaController.class).getPeliculaById(pelicula.getId())).withSelfRel(),
+                linkTo(methodOn(PeliculaController.class).getAllPeliculas()).withRel("peliculas")
+            ))
+            .collect(Collectors.toList());
+
+        return CollectionModel.of(peliculas,
+            linkTo(methodOn(PeliculaController.class).getAllPeliculas()).withSelfRel()
+        );
     }
-    
+
     @GetMapping("/{id}")
-    public Optional<Pelicula> getPeliculaById(@PathVariable Long id) {
-        return peliculaService.getPeliculaById(id);
+    public EntityModel<Pelicula> getPeliculaById(@PathVariable Long id) {
+        Pelicula pelicula = peliculaService.getPeliculaById(id)
+            .orElseThrow(() -> new RuntimeException("Pelicula no encontrada"));
+
+        return EntityModel.of(pelicula,
+            linkTo(methodOn(PeliculaController.class).getPeliculaById(id)).withSelfRel(),
+            linkTo(methodOn(PeliculaController.class).getAllPeliculas()).withRel("peliculas")
+        );
     }
-    @PostMapping()
-    public Pelicula createPelicula(@RequestBody Pelicula pelicula) {
-        return peliculaService.createPelicula(pelicula);
+
+    @PostMapping
+    public EntityModel<Pelicula> createPelicula(@RequestBody Pelicula pelicula) {
+        Pelicula nueva = peliculaService.createPelicula(pelicula);
+        return EntityModel.of(nueva,
+            linkTo(methodOn(PeliculaController.class).getPeliculaById(nueva.getId())).withSelfRel()
+        );
     }
-    
+
     @DeleteMapping("/{id}")
     public void deletePelicula(@PathVariable Long id) {
         peliculaService.deletePelicula(id);
     }
 
     @PutMapping("/{id}")
-    public Pelicula updatePelicula(@PathVariable Long id, @RequestBody Pelicula pelicula) {
-        return peliculaService.updatePelicula(id, pelicula);
+    public EntityModel<Pelicula> updatePelicula(@PathVariable Long id, @RequestBody Pelicula pelicula) {
+        Pelicula actualizada = peliculaService.updatePelicula(id, pelicula);
+        return EntityModel.of(actualizada,
+            linkTo(methodOn(PeliculaController.class).getPeliculaById(id)).withSelfRel()
+        );
     }
 }
